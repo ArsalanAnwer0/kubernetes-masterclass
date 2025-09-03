@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  labels:
+    app: frontend
+    component: load-balancer
+    team: frontend-team
+spec:
+  selector:
+    app: frontend
+    component: web-server
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  type: LoadBalancer
+---
+# Additional service that selects based on different criteria
+apiVersion: v1
+kind: Service
+metadata:
+  name: stable-release-service
+  labels:
+    app: frontend
+    component: stable-lb
+spec:
+  selector:
+    app: frontend
+    release: stable  # Only pods with release=stable
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+    

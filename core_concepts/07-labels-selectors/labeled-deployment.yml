@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-app
+  labels:
+    app: frontend
+    component: web-server
+    version: v1.2.3
+    environment: production
+    team: frontend-team
+    release: stable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend
+      component: web-server
+  template:
+    metadata:
+      labels:
+        app: frontend
+        component: web-server
+        version: v1.2.3
+        environment: production
+        team: frontend-team
+        release: stable
+    spec:
+      containers:
+      - name: frontend
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 512Mi
+
+---
