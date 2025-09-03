@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: development
+  labels:
+    environment: dev
+    team: backend
+    purpose: development
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    environment: prod
+    team: backend
+    purpose: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testing
+  labels:
+    environment: test
+    team: qa
+    purpose: testing
