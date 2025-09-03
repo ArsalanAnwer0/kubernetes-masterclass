@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    app: web-app
+data:
+  database_url: "postgresql://localhost:5432/mydb"
+  debug_mode: "true"
+  app_name: "My Web Application"
+  max_connections: "100"
+  timeout: "30"
