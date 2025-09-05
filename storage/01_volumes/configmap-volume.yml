@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-pod
+  labels:
+    app: configmap-volume-demo
+spec:
+  containers:
+  - name: app
+    image: nginx:1.21
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/config
+    - name: nginx-config
+      mountPath: /etc/nginx/conf.d
+  volumes:
+  - name: config-volume
+    configMap:
+      name: app-settings
+  - name: nginx-config
+    configMap:
+      name: nginx-custom-config
+      items:
+      - key: default.conf
+        path: default.conf
