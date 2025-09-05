@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pvc-deployment
+  labels:
+    app: pvc-app
+spec:
+  replicas: 1  # Start with 1 for RWO volumes
+  selector:
+    matchLabels:
+      app: pvc-app
+  template:
+    metadata:
+      labels:
+        app: pvc-app
+    spec:
+      containers:
+      - name: app
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: my-pvc
