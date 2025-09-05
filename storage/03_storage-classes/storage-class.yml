@@ -1,0 +1,29 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+  labels:
+    type: ssd
+    performance: high
+provisioner: kubernetes.io/host-path  # For local testing
+parameters:
+  type: "ssd"
+  cachingmode: "ReadWrite"
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: slow-hdd
+  labels:
+    type: hdd
+    performance: standard
+provisioner: kubernetes.io/host-path
+parameters:
+  type: "hdd"
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+

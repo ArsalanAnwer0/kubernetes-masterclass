@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app-dynamic
+  labels:
+    app: web-app-dynamic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app-dynamic
+  template:
+    metadata:
+      labels:
+        app: web-app-dynamic
+    spec:
+      containers:
+      - name: web-app
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: app-data
+          mountPath: /data
+        - name: backup-data
+          mountPath: /backup
+        env:
+        - name: STORAGE_TYPE
+          value: "dynamic"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      volumes:
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: dynamic-storage-claim
+      - name: backup-data
+        persistentVolumeClaim:
+          claimName: backup-storage-claim
+
