@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-api
+  labels:
+    service-type: externalname
+spec:
+  type: ExternalName
+  externalName: httpbin.org
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-database
+  labels:
+    service-type: externalname
+spec:
+  type: ExternalName
+  externalName: my-database.example.com
+  ports:
+  - name: postgres
+    port: 5432
+    protocol: TCP
