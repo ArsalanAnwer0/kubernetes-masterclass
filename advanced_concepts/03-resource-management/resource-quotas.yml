@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: resource-constrained
+  labels:
+    environment: testing
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-quota
+  namespace: resource-constrained
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    pods: "10"
+    persistentvolumeclaims: "4"
+    services: "5"
+    secrets: "10"
+    configmaps: "10"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: object-quota
+  namespace: resource-constrained
+spec:
+  hard:
+    count/deployments.apps: "5"
+    count/jobs.batch: "3"
+    count/cronjobs.batch: "2"
+    count/services: "5"
+    count/secrets: "10"
+---
+# Test deployment in resource-constrained namespace
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quota-test
+  namespace: resource-constrained
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: quota-test
+  template:
+    metadata:
+      labels:
+        app: quota-test
+    spec:
+      containers:
+      - name: app
+        image: nginx:1.21
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 400m
+            memory: 512Mi

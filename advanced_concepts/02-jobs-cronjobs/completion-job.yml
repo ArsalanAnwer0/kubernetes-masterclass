@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: completion-job
+  labels:
+    app: completion-job
+    type: sequential-batch
+spec:
+  completions: 5
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: completion-job
+        type: sequential-batch
+    spec:
+      containers:
+      - name: sequential-worker
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Sequential job started: $POD_NAME"
+          echo "Start time: $(date)"
+          
+          # Simulate processing a work item
+          ITEM_ID=$((RANDOM % 1000))
+          echo "Processing item ID: $ITEM_ID"
+          
+          echo "Phase 1: Validation"
+          sleep 5
+          echo "✓ Item $ITEM_ID validated"
+          
+          echo "Phase 2: Processing"
+          sleep 8
+          echo "✓ Item $ITEM_ID processed"
+          
+          echo "Phase 3: Cleanup"
+          sleep 3
+          echo "✓ Item $ITEM_ID cleanup complete"
+          
+          echo "Item $ITEM_ID completed successfully at: $(date)"
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+      restartPolicy: OnFailure
+  backoffLimit: 3

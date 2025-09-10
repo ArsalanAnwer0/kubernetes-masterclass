@@ -1,0 +1,133 @@
+# Example 1: Web application with comprehensive probes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app-probes
+  labels:
+    app: web-app-probes
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app-probes
+  template:
+    metadata:
+      labels:
+        app: web-app-probes
+    spec:
+      containers:
+      - name: web-app
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        startupProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 6  # 30 seconds max startup time
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: liveness
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: readiness
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+# Example 2: Database with conservative probe settings
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database-probes
+  labels:
+    app: database-probes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: database-probes
+  template:
+    metadata:
+      labels:
+        app: database-probes
+    spec:
+      containers:
+      - name: database
+        image: postgres:13
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_PASSWORD
+          value: secretpassword
+        - name: POSTGRES_DB
+          value: healthdb
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U postgres -d healthdb
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 12  # 2 minutes for database startup
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U postgres -d healthdb
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - |
+              # More comprehensive readiness check
+              pg_isready -U postgres -d healthdb && \
+              psql -U postgres -d healthdb -c "SELECT 1;" > /dev/null
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi

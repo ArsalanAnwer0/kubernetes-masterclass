@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: simple-job
+  labels:
+    app: simple-job
+    type: batch
+spec:
+  template:
+    metadata:
+      labels:
+        app: simple-job
+        type: batch
+    spec:
+      containers:
+      - name: job-container
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Job started at: $(date)"
+          echo "Job ID: $JOB_NAME"
+          echo "Pod name: $POD_NAME"
+          
+          echo "Performing task..."
+          for i in $(seq 1 10); do
+            echo "Processing item $i/10"
+            sleep 2
+          done
+          
+          echo "Task completed successfully at: $(date)"
+          echo "Job finished"
+        env:
+        - name: JOB_NAME
+          value: "simple-job"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+      restartPolicy: OnFailure
+  backoffLimit: 3

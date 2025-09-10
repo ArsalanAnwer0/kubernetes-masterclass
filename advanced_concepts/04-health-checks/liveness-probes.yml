@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: liveness-demo
+  labels:
+    app: liveness-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: liveness-demo
+  template:
+    metadata:
+      labels:
+        app: liveness-demo
+    spec:
+      containers:
+      - name: liveness-container
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Starting application with liveness check"
+          
+          # Create health check file
+          touch /tmp/healthy
+          
+          # Simulate application startup
+          sleep 10
+          echo "Application started successfully"
+          
+          # Run application loop
+          counter=0
+          while true; do
+            counter=$((counter + 1))
+            echo "Application running... iteration $counter"
+            
+            # Simulate application becoming unhealthy after 5 minutes
+            if [ $counter -gt 60 ]; then
+              echo "Simulating application failure - removing health file"
+              rm -f /tmp/healthy
+              # Application continues running but is unhealthy
+            fi
+            
+            sleep 5
+          done
+        livenessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/healthy
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+---
+# HTTP Liveness Probe example
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-liveness-demo
+  labels:
+    app: http-liveness-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-liveness-demo
+  template:
+    metadata:
+      labels:
+        app: http-liveness-demo
+    spec:
+      containers:
+      - name: web-server
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+            httpHeaders:
+            - name: Custom-Header
+              value: liveness-check
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi

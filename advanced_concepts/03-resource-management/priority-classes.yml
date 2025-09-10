@@ -1,0 +1,89 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000
+globalDefault: false
+description: "High priority class for critical applications"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: medium-priority
+value: 500
+globalDefault: false
+description: "Medium priority class for important applications"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low-priority
+value: 100
+globalDefault: true
+description: "Low priority class for batch jobs and non-critical workloads"
+---
+# High priority deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: critical-app
+  labels:
+    app: critical-app
+    priority: high
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: critical-app
+  template:
+    metadata:
+      labels:
+        app: critical-app
+        priority: high
+    spec:
+      priorityClassName: high-priority
+      containers:
+      - name: critical-app
+        image: nginx:1.21
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+# Low priority batch job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batch-processing
+  labels:
+    app: batch-processing
+    priority: low
+spec:
+  template:
+    metadata:
+      labels:
+        app: batch-processing
+        priority: low
+    spec:
+      priorityClassName: low-priority
+      containers:
+      - name: batch-worker
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Low priority batch job started"
+          sleep 300
+          echo "Batch job completed"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      restartPolicy: OnFailure

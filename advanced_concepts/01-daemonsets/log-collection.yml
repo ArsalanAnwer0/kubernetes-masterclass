@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-collector
+  labels:
+    app: log-collector
+    component: logging
+spec:
+  selector:
+    matchLabels:
+      app: log-collector
+  template:
+    metadata:
+      labels:
+        app: log-collector
+        component: logging
+    spec:
+      containers:
+      - name: log-collector
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Log collector started on node: $NODE_NAME"
+          echo "Monitoring log directories:"
+          echo "- /var/log/pods"
+          echo "- /var/log/containers"
+          
+          while true; do
+            echo "$(date): Collecting logs from $NODE_NAME"
+            
+            # Count log files
+            POD_LOGS=$(find /var/log/pods -name "*.log" 2>/dev/null | wc -l)
+            CONTAINER_LOGS=$(find /var/log/containers -name "*.log" 2>/dev/null | wc -l)
+            
+            echo "Found $POD_LOGS pod log files and $CONTAINER_LOGS container log files"
+            
+            # Simulate log processing
+            if [ $POD_LOGS -gt 0 ]; then
+              echo "Processing pod logs..."
+              find /var/log/pods -name "*.log" -mmin -1 2>/dev/null | head -3 | while read logfile; do
+                echo "Processing: $logfile"
+                tail -5 "$logfile" 2>/dev/null | head -2 | sed 's/^/  LOG: /'
+              done
+            fi
+            
+            echo "Log collection cycle complete"
+            sleep 45
+          done
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: var-log-pods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: var-log-containers
+          mountPath: /var/log/containers
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: var-log-pods
+        hostPath:
+          path: /var/log/pods
+      - name: var-log-containers
+        hostPath:
+          path: /var/log/containers
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule

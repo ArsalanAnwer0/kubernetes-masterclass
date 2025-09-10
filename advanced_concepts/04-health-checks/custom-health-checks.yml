@@ -1,0 +1,154 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-health-demo
+  labels:
+    app: custom-health-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: custom-health-demo
+  template:
+    metadata:
+      labels:
+        app: custom-health-demo
+    spec:
+      containers:
+      - name: app-with-custom-health
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Starting application with custom health checks"
+          
+          # Create health check script
+          cat > /tmp/health-check.sh << 'EOF'
+          #!/bin/sh
+          # Custom health check logic
+          
+          # Check if application process is running
+          if ! pgrep -f "main-app" > /dev/null; then
+            echo "Main application process not found"
+            exit 1
+          fi
+          
+          # Check if required files exist
+          if [ ! -f /tmp/app-config ]; then
+            echo "Configuration file missing"
+            exit 1
+          fi
+          
+          # Check disk space
+          DISK_USAGE=$(df /tmp | tail -1 | awk '{print $5}' | sed 's/%//')
+          if [ "$DISK_USAGE" -gt 90 ]; then
+            echo "Disk usage too high: ${DISK_USAGE}%"
+            exit 1
+          fi
+          
+          # Check memory usage simulation
+          if [ -f /tmp/memory-pressure ]; then
+            echo "Memory pressure detected"
+            exit 1
+          fi
+          
+          echo "Health check passed"
+          exit 0
+          EOF
+          
+          chmod +x /tmp/health-check.sh
+          
+          # Create readiness check script
+          cat > /tmp/readiness-check.sh << 'EOF'
+          #!/bin/sh
+          # Custom readiness check logic
+          
+          # Check if initialization is complete
+          if [ ! -f /tmp/init-complete ]; then
+            echo "Initialization not complete"
+            exit 1
+          fi
+          
+          # Check if external dependencies are available
+          if [ -f /tmp/dependency-unavailable ]; then
+            echo "External dependency unavailable"
+            exit 1
+          fi
+          
+          echo "Readiness check passed"
+          exit 0
+          EOF
+          
+          chmod +x /tmp/readiness-check.sh
+          
+          # Simulate application startup
+          echo "Initializing application..."
+          sleep 15
+          
+          # Create necessary files
+          touch /tmp/app-config
+          echo "main-app" > /tmp/main-app.pid
+          
+          # Start background "application"
+          (
+            while true; do
+              sleep 1
+            done
+          ) &
+          echo $! > /tmp/main-app.pid
+          
+          # Mark initialization complete
+          touch /tmp/init-complete
+          echo "Application initialized"
+          
+          # Main application loop
+          counter=0
+          while true; do
+            counter=$((counter + 1))
+            echo "Application running... iteration $counter"
+            
+            # Simulate various conditions
+            if [ $((counter % 50)) -eq 0 ]; then
+              echo "Simulating dependency issue"
+              touch /tmp/dependency-unavailable
+              sleep 20
+              rm -f /tmp/dependency-unavailable
+              echo "Dependency restored"
+            fi
+            
+            if [ $((counter % 100)) -eq 0 ]; then
+              echo "Simulating memory pressure"
+              touch /tmp/memory-pressure
+              sleep 30
+              rm -f /tmp/memory-pressure
+              echo "Memory pressure resolved"
+            fi
+            
+            sleep 5
+          done
+        livenessProbe:
+          exec:
+            command:
+            - /tmp/health-check.sh
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /tmp/readiness-check.sh
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 2
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

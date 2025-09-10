@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: simple-daemon
+  labels:
+    app: simple-daemon
+    component: system
+spec:
+  selector:
+    matchLabels:
+      app: simple-daemon
+  template:
+    metadata:
+      labels:
+        app: simple-daemon
+        component: system
+    spec:
+      containers:
+      - name: daemon-container
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Starting daemon on node: $NODE_NAME"
+          while true; do
+            echo "$(date): Daemon running on $NODE_NAME - PID: $$"
+            sleep 30
+          done
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+          limits:
+            cpu: 50m
+            memory: 50Mi
+      terminationGracePeriodSeconds: 30

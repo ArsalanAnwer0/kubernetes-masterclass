@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parallel-job
+  labels:
+    app: parallel-job
+    type: parallel-batch
+spec:
+  parallelism: 3
+  completions: 6
+  template:
+    metadata:
+      labels:
+        app: parallel-job
+        type: parallel-batch
+    spec:
+      containers:
+      - name: worker
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Parallel worker started: $POD_NAME"
+          echo "Worker ID: $WORKER_ID"
+          echo "Start time: $(date)"
+          
+          # Simulate different work duration for each worker
+          WORK_TIME=$((RANDOM % 30 + 15))
+          echo "This worker will take $WORK_TIME seconds"
+          
+          for i in $(seq 1 $WORK_TIME); do
+            if [ $((i % 5)) -eq 0 ]; then
+              echo "Worker $POD_NAME: Progress $i/$WORK_TIME"
+            fi
+            sleep 1
+          done
+          
+          echo "Worker $POD_NAME completed at: $(date)"
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+      restartPolicy: OnFailure
+  backoffLimit: 2

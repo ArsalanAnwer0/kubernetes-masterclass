@@ -1,0 +1,78 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup
+  labels:
+    app: db-backup
+    type: maintenance
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    metadata:
+      labels:
+        app: db-backup
+        type: maintenance
+    spec:
+      template:
+        metadata:
+          labels:
+            app: db-backup
+            type: maintenance
+        spec:
+          containers:
+          - name: backup-container
+            image: postgres:13
+            command:
+            - sh
+            - -c
+            - |
+              echo "Database backup started at: $(date)"
+              
+              # Check if database is accessible
+              echo "Checking database connectivity..."
+              if pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; then
+                echo "✓ Database is accessible"
+              else
+                echo "✗ Database backup failed - cannot connect"
+                exit 1
+              fi
+              
+              # Create backup filename
+              BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
+              echo "Creating backup: $BACKUP_FILE"
+              
+              # Simulate backup process
+              echo "Backing up database..."
+              sleep 15
+              
+              echo "-- PostgreSQL database dump" > /tmp/$BACKUP_FILE
+              echo "-- Backup created on $(date)" >> /tmp/$BACKUP_FILE
+              echo "-- Database: $DB_NAME" >> /tmp/$BACKUP_FILE
+              
+              echo "✓ Backup completed: $BACKUP_FILE"
+              echo "Backup size: $(du -h /tmp/$BACKUP_FILE | cut -f1)"
+              
+              echo "Database backup completed at: $(date)"
+            env:
+            - name: DB_HOST
+              value: "postgres.default.svc.cluster.local"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_NAME
+              value: "postgres"
+            - name: PGPASSWORD
+              value: "secret123"
+            resources:
+              requests:
+                cpu: 200m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  

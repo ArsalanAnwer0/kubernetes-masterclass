@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-monitor
+  labels:
+    app: node-monitor
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: node-monitor
+  template:
+    metadata:
+      labels:
+        app: node-monitor
+        component: monitoring
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: node-monitor
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Node monitoring started on: $NODE_NAME"
+          while true; do
+            echo "=== Node Stats for $NODE_NAME ==="
+            echo "CPU Info:"
+            cat /proc/cpuinfo | grep "model name" | head -1
+            echo "Memory Info:"
+            free -h
+            echo "Disk Usage:"
+            df -h | head -5
+            echo "Load Average:"
+            uptime
+            echo "================================"
+            sleep 60
+          done
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule

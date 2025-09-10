@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: readiness-demo
+  labels:
+    app: readiness-demo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: readiness-demo
+  template:
+    metadata:
+      labels:
+        app: readiness-demo
+    spec:
+      containers:
+      - name: readiness-container
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Starting application with readiness check"
+          
+          # Simulate long startup time
+          echo "Initializing application..."
+          sleep 20
+          
+          # Create readiness indicator
+          touch /tmp/ready
+          echo "Application is now ready to serve traffic"
+          
+          # Simulate periodic readiness checks
+          counter=0
+          while true; do
+            counter=$((counter + 1))
+            echo "Processing request $counter"
+            
+            # Simulate temporary unavailability every 2 minutes
+            if [ $((counter % 24)) -eq 0 ]; then
+              echo "Simulating temporary overload - marking as not ready"
+              rm -f /tmp/ready
+              sleep 30
+              echo "Recovered from overload - marking as ready"
+              touch /tmp/ready
+            fi
+            
+            sleep 5
+          done
+        readinessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/ready
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: readiness-demo-service
+spec:
+  selector:
+    app: readiness-demo
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
+---
+# TCP Readiness Probe example
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tcp-readiness-demo
+  labels:
+    app: tcp-readiness-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tcp-readiness-demo
+  template:
+    metadata:
+      labels:
+        app: tcp-readiness-demo
+    spec:
+      containers:
+      - name: tcp-server
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Starting TCP server"
+          # Simulate server startup
+          sleep 15
+          echo "TCP server ready on port 8080"
+          # Keep container running and simulate a TCP service
+          while true; do
+            nc -l -p 8080 -e echo "Hello from TCP server" 2>/dev/null || sleep 5
+          done
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 2
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi

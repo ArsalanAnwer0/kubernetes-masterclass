@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: basic-cronjob
+  labels:
+    app: scheduled-task
+    type: recurring
+spec:
+  schedule: "*/2 * * * *"  # Every 2 minutes
+  jobTemplate:
+    metadata:
+      labels:
+        app: scheduled-task
+        type: recurring
+    spec:
+      template:
+        metadata:
+          labels:
+            app: scheduled-task
+            type: recurring
+        spec:
+          containers:
+          - name: scheduled-container
+            image: busybox:1.35
+            command:
+            - sh
+            - -c
+            - |
+              echo "Scheduled job execution started"
+              echo "Execution time: $(date)"
+              echo "Job name: $JOB_NAME"
+              echo "Cron schedule: */2 * * * *"
+              
+              # Simulate scheduled task
+              echo "Performing scheduled maintenance..."
+              sleep 10
+              
+              echo "Checking system status..."
+              echo "✓ CPU usage: Normal"
+              echo "✓ Memory usage: Normal" 
+              echo "✓ Disk usage: Normal"
+              
+              echo "Scheduled task completed at: $(date)"
+            env:
+            - name: JOB_NAME
+              value: "basic-cronjob"
+            resources:
+              requests:
+                cpu: 50m
+                memory: 32Mi
+              limits:
+                cpu: 100m
+                memory: 64Mi
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid

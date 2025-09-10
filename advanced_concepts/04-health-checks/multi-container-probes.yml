@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-container-health
+  labels:
+    app: multi-container-health
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multi-container-health
+  template:
+    metadata:
+      labels:
+        app: multi-container-health
+    spec:
+      containers:
+      - name: web-server
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        volumeMounts:
+        - name: shared-data
+          mountPath: /usr/share/nginx/html
+      - name: content-updater
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Content updater started"
+          
+          # Create initial content
+          cat > /shared/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head><title>Multi-Container App</title></head>
+          <body>
+            <h1>Multi-Container Health Demo</h1>
+            <p>Content updated by sidecar container</p>
+            <p>Last update: TIMESTAMP</p>
+          </body>
+          </html>
+          EOF
+          
+          # Mark as ready
+          touch /tmp/updater-ready
+          
+          # Update content periodically
+          counter=0
+          while true; do
+            counter=$((counter + 1))
+            timestamp=$(date)
+            sed "s/TIMESTAMP/$timestamp/" /shared/index.html > /shared/index.html.tmp
+            mv /shared/index.html.tmp /shared/index.html
+            echo "Content updated: $counter"
+            
+            # Simulate updater health issues periodically
+            if [ $((counter % 20)) -eq 0 ]; then
+              echo "Simulating updater maintenance"
+              rm -f /tmp/updater-ready
+              sleep 15
+              touch /tmp/updater-ready
+              echo "Updater back online"
+            fi
+            
+            sleep 30
+          done
+        livenessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/updater-ready
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/updater-ready
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+      volumes:
+      - name: shared-data
+        emptyDir: {}

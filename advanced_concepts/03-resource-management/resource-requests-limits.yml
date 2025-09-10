@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-demo
+  labels:
+    app: resource-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: resource-demo
+  template:
+    metadata:
+      labels:
+        app: resource-demo
+    spec:
+      containers:
+      - name: cpu-intensive
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "CPU intensive container started"
+          while true; do
+            echo "Performing CPU intensive task..."
+            # Simulate CPU work
+            for i in $(seq 1 1000); do
+              echo $i > /dev/null
+            done
+            sleep 5
+          done
+        resources:
+          requests:
+            cpu: 100m      # 0.1 CPU cores
+            memory: 128Mi  # 128 MiB
+          limits:
+            cpu: 500m      # 0.5 CPU cores
+            memory: 256Mi  # 256 MiB
+      - name: memory-intensive
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Memory intensive container started"
+          while true; do
+            echo "Allocating memory..."
+            # Simulate memory usage
+            dd if=/dev/zero of=/tmp/memory_test bs=1M count=50 2>/dev/null
+            sleep 10
+            rm -f /tmp/memory_test
+            sleep 20
+          done
+        resources:
+          requests:
+            cpu: 50m       # 0.05 CPU cores
+            memory: 256Mi  # 256 MiB
+          limits:
+            cpu: 200m      # 0.2 CPU cores
+            memory: 512Mi  # 512 MiB
+---
+# QoS Classes demonstration
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guaranteed-pod
+  labels:
+    qos-class: guaranteed
+spec:
+  containers:
+  - name: app
+    image: nginx:1.21
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 200m      # Same as requests = Guaranteed
+        memory: 256Mi  # Same as requests = Guaranteed
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: burstable-pod
+  labels:
+    qos-class: burstable
+spec:
+  containers:
+  - name: app
+    image: nginx:1.21
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m      # Higher than requests = Burstable
+        memory: 512Mi  # Higher than requests = Burstable
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: besteffort-pod
+  labels:
+    qos-class: besteffort
+spec:
+  containers:
+  - name: app
+    image: nginx:1.21
+    # No resources specified = BestEffort

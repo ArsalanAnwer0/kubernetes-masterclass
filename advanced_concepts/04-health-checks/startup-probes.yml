@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: startup-demo
+  labels:
+    app: startup-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: startup-demo
+  template:
+    metadata:
+      labels:
+        app: startup-demo
+    spec:
+      containers:
+      - name: slow-startup-container
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Starting slow application..."
+          
+          # Simulate very slow startup (2 minutes)
+          for i in $(seq 1 24); do
+            echo "Startup progress: $((i * 5))%"
+            sleep 5
+          done
+          
+          # Application is now started
+          touch /tmp/started
+          echo "Application startup completed"
+          
+          # Create health and readiness indicators
+          touch /tmp/healthy
+          touch /tmp/ready
+          
+          # Run application
+          counter=0
+          while true; do
+            counter=$((counter + 1))
+            echo "Application running... iteration $counter"
+            sleep 10
+          done
+        startupProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/started
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 15  # Allow up to 150 seconds for startup
+        livenessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/healthy
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/ready
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi

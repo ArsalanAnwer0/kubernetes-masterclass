@@ -1,0 +1,115 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-job
+  labels:
+    app: cleanup
+    type: maintenance
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    metadata:
+      labels:
+        app: cleanup
+        type: maintenance
+    spec:
+      template:
+        metadata:
+          labels:
+            app: cleanup
+            type: maintenance
+        spec:
+          serviceAccountName: cleanup-service-account
+          containers:
+          - name: cleanup-container
+            image: bitnami/kubectl:latest
+            command:
+            - sh
+            - -c
+            - |
+              echo "Cleanup job started at: $(date)"
+              
+              echo "=== Kubernetes Resource Cleanup ==="
+              
+              # Cleanup completed jobs older than 1 hour
+              echo "Cleaning up old completed jobs..."
+              COMPLETED_JOBS=$(kubectl get jobs --all-namespaces --field-selector=status.successful=1 --no-headers 2>/dev/null | wc -l || echo 0)
+              echo "Found $COMPLETED_JOBS completed jobs"
+              
+              # List failed pods
+              echo "Checking for failed pods..."
+              FAILED_PODS=$(kubectl get pods --all-namespaces --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || echo 0)
+              echo "Found $FAILED_PODS failed pods"
+              
+              # Cleanup configmaps with cleanup label
+              echo "Cleaning up labeled configmaps..."
+              kubectl get configmaps --all-namespaces -l cleanup=true --no-headers 2>/dev/null | while IFS=' ' read -r namespace name rest; do
+                if [ "$namespace" != "" ] && [ "$name" != "" ]; then
+                  echo "Cleaning up configmap: $namespace/$name"
+                  kubectl delete configmap "$name" -n "$namespace" 2>/dev/null || echo "Failed to delete $namespace/$name"
+                fi
+              done
+              
+              # Cleanup evicted pods
+              echo "Cleaning up evicted pods..."
+              kubectl get pods --all-namespaces --field-selector=status.phase=Failed -o json 2>/dev/null | \
+              jq -r '.items[] | select(.status.reason=="Evicted") | "\(.metadata.namespace) \(.metadata.name)"' 2>/dev/null | \
+              while read -r namespace name; do
+                if [ "$namespace" != "" ] && [ "$name" != "" ]; then
+                  echo "Deleting evicted pod: $namespace/$name"
+                  kubectl delete pod "$name" -n "$namespace" 2>/dev/null || echo "Failed to delete evicted pod $namespace/$name"
+                fi
+              done || echo "No evicted pods found or jq not available"
+              
+              echo "=== Cleanup Summary ==="
+              echo "Current status:"
+              echo "- Running pods: $(kubectl get pods --all-namespaces --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo 'unknown')"
+              echo "- Failed pods: $(kubectl get pods --all-namespaces --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || echo 'unknown')"
+              echo "- Completed jobs: $(kubectl get jobs --all-namespaces --field-selector=status.successful=1 --no-headers 2>/dev/null | wc -l || echo 'unknown')"
+              
+              echo "Cleanup job completed at: $(date)"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 2
+  concurrencyPolicy: Forbid
+---
+# Service Account for cleanup job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cleanup-service-account
+  namespace: default
+---
+# ClusterRole with permissions for cleanup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cleanup-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "configmaps"]
+  verbs: ["get", "list", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "delete"]
+---
+# ClusterRoleBinding to grant permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cleanup-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cleanup-role
+subjects:
+- kind: ServiceAccount
+  name: cleanup-service-account
+  namespace: default
